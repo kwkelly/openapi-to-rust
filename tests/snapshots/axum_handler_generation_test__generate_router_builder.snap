@@ -1,6 +1,5 @@
 ---
 source: tests/axum_handler_generation_test.rs
-assertion_line: 277
 expression: result_str
 ---
 use axum::{
@@ -12,6 +11,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
+use super::types::*;
 /// Error type for API handlers
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
@@ -96,7 +96,7 @@ where
     H: ApiHandlers + Clone + Send + Sync + 'static,
 {
     Router::new()
-        .route("/users", post(handle_create_user))
-        .route("/users", get(handle_get_users))
+        .route("/users", post(handle_create_user::<H>))
+        .route("/users", get(handle_get_users::<H>))
         .with_state(handler)
 }
