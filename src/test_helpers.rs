@@ -270,6 +270,7 @@ pub fn run_generation_test(
             .and_then(|o| o.enable_async_client)
             .unwrap_or(false),
         enable_specta: false,
+        enable_axum_handlers: false,
         type_mappings: {
             let mut mappings = std::collections::BTreeMap::new();
             mappings.insert("integer".to_string(), "i64".to_string());

@@ -491,7 +491,7 @@ impl CodeGenerator {
     }
 
     /// Generate documentation comment for the operation
-    fn generate_operation_doc_comment(&self, op: &OperationInfo) -> TokenStream {
+    pub fn generate_operation_doc_comment(&self, op: &OperationInfo) -> TokenStream {
         let method = op.method.to_uppercase();
         let path = &op.path;
         let doc = format!("{} {}", method, path);
@@ -592,7 +592,7 @@ impl CodeGenerator {
     }
 
     /// Get the Rust type for a parameter
-    fn get_param_rust_type(&self, param: &crate::analysis::ParameterInfo) -> TokenStream {
+    pub fn get_param_rust_type(&self, param: &crate::analysis::ParameterInfo) -> TokenStream {
         let type_str = &param.rust_type;
         match type_str.as_str() {
             "String" => quote! { impl AsRef<str> },

@@ -1,0 +1,95 @@
+---
+source: tests/axum_handler_generation_test.rs
+assertion_line: 311
+expression: result_str
+---
+use axum::{
+    extract::{Path, Query, Json, State},
+    http::StatusCode, response::{IntoResponse, Response},
+    routing::{get, post, put, delete, patch},
+    Router,
+};
+use serde::{Deserialize, Serialize};
+use std::future::Future;
+use std::pin::Pin;
+/// Error type for API handlers
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("Not found: {0}")]
+    NotFound(String),
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
+    #[error("Internal server error: {0}")]
+    InternalServerError(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+}
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, message) = match self {
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            ApiError::InternalServerError(msg) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, msg)
+            }
+            ApiError::ServiceUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg),
+        };
+        let body = serde_json::json!({ "error" : message, });
+        (status, Json(body)).into_response()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetUserPathParams {
+    pub id: impl AsRef<str>,
+}
+/// Trait defining all API handlers
+///
+/// Implement this trait to provide business logic for each endpoint.
+/// The generated router will call these methods when routes are matched.
+#[async_trait::async_trait]
+pub trait ApiHandlers: Send + Sync + 'static {
+    type Error: std::error::Error + Send + Sync + 'static;
+    ///GET /users/{id}
+    async fn get_user(
+        &self,
+        Path(GetUserPathParams): Path<GetUserPathParams>,
+    ) -> Result<Json<User>, Self::Error>;
+}
+async fn handle_get_user<H>(
+    State(handler): State<H>,
+    Path(path_params): Path<GetUserPathParams>,
+) -> impl IntoResponse
+where
+    H: ApiHandlers,
+{
+    match handler.get_user(Path(path_params)).await {
+        Ok(response) => response.into_response(),
+        Err(err) => {
+            let api_error = ApiError::InternalServerError(err.to_string());
+            api_error.into_response()
+        }
+    }
+}
+/// Create a router with all API endpoints
+///
+/// # Example
+/// ```rust,ignore
+/// let app = create_router(my_handler);
+/// let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+/// axum::serve(listener, app).await.unwrap();
+/// ```
+pub fn create_router<H>(handler: H) -> Router<H>
+where
+    H: ApiHandlers + Clone + Send + Sync + 'static,
+{
+    Router::new().route("/users/{id}", get(handle_get_user)).with_state(handler)
+}

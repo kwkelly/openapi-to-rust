@@ -183,6 +183,8 @@ pub struct FeaturesSection {
     pub enable_async_client: bool,
     #[serde(default)]
     pub enable_specta: bool,
+    #[serde(default)]
+    pub enable_axum_handlers: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Validate)]
@@ -530,6 +532,7 @@ impl ConfigFile {
             enable_sse_client: self.features.enable_sse_client,
             enable_async_client: self.features.enable_async_client,
             enable_specta: self.features.enable_specta,
+            enable_axum_handlers: self.features.enable_axum_handlers,
             type_mappings: if self.type_mappings.is_empty() {
                 super::generator::default_type_mappings()
             } else {

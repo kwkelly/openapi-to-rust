@@ -10,6 +10,9 @@ pub mod openapi;
 pub mod patterns;
 pub mod streaming;
 
+#[cfg(feature = "axum-handlers")]
+pub mod axum_generator;
+
 pub mod test_helpers;
 
 pub use analysis::{SchemaAnalysis, SchemaAnalyzer, merge_schema_extensions};

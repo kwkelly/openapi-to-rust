@@ -5,7 +5,7 @@
 [![docs.rs](https://docs.rs/openapi-to-rust/badge.svg)](https://docs.rs/openapi-to-rust)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A Rust code generator that creates strongly-typed structs, HTTP clients, and SSE streaming clients from OpenAPI 3.1 specifications.
+A Rust code generator that creates strongly-typed structs, HTTP clients, SSE streaming clients, and axum server handlers from OpenAPI 3.1 specifications.
 
 We originally built this internally at [GPU CLI](https://gpu-cli.sh) to generate typed Rust clients for OpenAI, Anthropic, and other APIs. After battle-testing it against real-world specs with complex union types, discriminated enums, and streaming endpoints, we decided to open source it.
 
@@ -14,6 +14,7 @@ We originally built this internally at [GPU CLI](https://gpu-cli.sh) to generate
 - **OpenAPI 3.1 support** — objects, arrays, enums, `oneOf`, `anyOf`, `allOf`, discriminated unions
 - **HTTP client generation** — async clients with retry logic, tracing, and auth middleware
 - **SSE streaming clients** — first-class Server-Sent Events support with reconnection
+- **Axum handler generation** — server-side handler stubs and traits for building APIs
 - **Smart `$ref` resolution** — handles circular references and deep nesting
 - **Discriminator detection** — auto-detects tagged unions from `oneOf`/`anyOf` with const properties
 - **TOML configuration** — declarative config as an alternative to the Rust API
@@ -27,6 +28,9 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 openapi-to-rust = "0.1"
+
+# For axum handler generation, enable the feature:
+# openapi-to-rust = { version = "0.1", features = ["axum-handlers"] }
 ```
 
 Or install the CLI:
@@ -49,6 +53,7 @@ module_name = "api"
 
 [features]
 enable_async_client = true
+enable_axum_handlers = false  # Set to true to generate server handlers
 
 [http_client]
 base_url = "https://api.example.com"
@@ -87,6 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         module_name: "api".to_string(),
         enable_sse_client: true,
         enable_async_client: true,
+        enable_axum_handlers: true,  // Generate server handlers
         ..Default::default()
     };
 
@@ -101,13 +107,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Generated Output
 
-The generator produces up to four files:
+The generator produces up to five files:
 
 | File | Description |
 |------|-------------|
 | `types.rs` | All struct/enum definitions from OpenAPI schemas |
 | `client.rs` | Async HTTP client with typed methods per operation |
 | `streaming.rs` | SSE streaming client with event parsing |
+| `handlers.rs` | Axum handler trait and router builder (optional) |
 | `mod.rs` | Module declarations |
 
 ### Generated Client Usage
@@ -127,6 +134,120 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Axum Handler Generation
+
+Enable the `axum-handlers` feature to generate server-side handler stubs:
+
+```toml
+[dependencies]
+openapi-to-rust = { version = "0.1", features = ["axum-handlers"] }
+```
+
+### Generated Handler Structure
+
+The generator creates:
+
+1. **`ApiHandlers` trait** — Defines all endpoint handlers as async methods
+2. **Parameter structs** — `PathParams` and `QueryParams` for each operation
+3. **`ApiError` enum** — Error type with `IntoResponse` implementation
+4. **`create_router` function** — Builds an axum `Router` from your implementation
+
+### Example Generated Code
+
+For an OpenAPI spec with:
+
+```yaml
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+```
+
+The generator produces:
+
+```rust
+// Parameter struct
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetUserPathParams {
+    pub id: String,
+}
+
+// Handler trait
+#[async_trait::async_trait]
+pub trait ApiHandlers: Send + Sync + 'static {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    async fn get_user(
+        &self,
+        Path(params): Path<GetUserPathParams>,
+    ) -> Result<Json<User>, Self::Error>;
+}
+
+// Router builder
+pub fn create_router<H>(handler: H) -> Router<H>
+where
+    H: ApiHandlers + Clone + Send + Sync + 'static,
+{
+    Router::new()
+        .route("/users/{id}", get(handle_get_user))
+        .with_state(handler)
+}
+```
+
+### Implementing the Handlers
+
+```rust
+use api::handlers::{ApiHandlers, create_router, ApiError};
+use api::types::User;
+use axum::{extract::Path, Json};
+
+struct MyHandler {
+    db: Database,
+}
+
+#[async_trait::async_trait]
+impl ApiHandlers for MyHandler {
+    type Error = ApiError;
+
+    async fn get_user(
+        &self,
+        Path(params): Path<GetUserPathParams>,
+    ) -> Result<Json<User>, Self::Error> {
+        let user = self.db.find_user(&params.id).await
+            .ok_or_else(|| ApiError::NotFound(format!("User {} not found", params.id)))?;
+        Ok(Json(user))
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let handler = MyHandler { db: Database::new() };
+    let app = create_router(handler);
+    
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+```
+
+### Handler Features
+
+- **Automatic parameter extraction** — Path, query, and header parameters mapped to axum extractors
+- **Type-safe request bodies** — JSON bodies use generated types from `types.rs`
+- **Error handling** — Built-in `ApiError` enum with HTTP status code mapping
+- **Router generation** — Automatic route registration with correct HTTP methods
 
 ## HTTP Client Features
 
@@ -211,6 +332,7 @@ module_name = "types"                   # Module name (required)
 enable_sse_client = true                # Generate SSE streaming client
 enable_async_client = true              # Generate HTTP REST client
 enable_specta = false                   # Add specta::Type derives
+enable_axum_handlers = false            # Generate axum server handlers
 
 [http_client]
 base_url = "https://api.example.com"
@@ -245,6 +367,9 @@ value = "application/json"
 # Run all tests
 cargo test
 
+# Run with axum feature enabled
+cargo test --features axum-handlers
+
 # Run snapshot tests
 cargo insta test
 
@@ -258,6 +383,7 @@ The `examples/` directory contains working examples for:
 
 - Basic type generation
 - HTTP client generation
+- Axum handler generation
 - Discriminated unions and `anyOf`/`oneOf` patterns
 - `allOf` composition
 - Inline objects and enums
@@ -268,8 +394,16 @@ The `examples/` directory contains working examples for:
 ```bash
 cargo run --example basic_generation
 cargo run --example client_generation_example
+cargo run --example axum_handler_generation --features axum-handlers
 cargo run --example discriminated_unions
 ```
+
+## Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `specta` | Add `specta::Type` derives for TypeScript codegen |
+| `axum-handlers` | Generate axum server handler stubs and traits |
 
 ## Contributing
 

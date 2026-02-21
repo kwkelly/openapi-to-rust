@@ -5,6 +5,9 @@ pub enum GeneratorError {
     #[error("Failed to parse OpenAPI spec: {0}")]
     ParseError(#[from] serde_json::Error),
 
+    #[error("Failed to parse generated code: {0}")]
+    SynError(#[from] syn::Error),
+
     #[error("Unresolved schema reference: {0}")]
     UnresolvedReference(String),
 

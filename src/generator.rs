@@ -27,6 +27,8 @@ pub struct GeneratorConfig {
     pub enable_async_client: bool,
     /// Enable Specta type derives for frontend integration
     pub enable_specta: bool,
+    /// Enable axum handler stub generation
+    pub enable_axum_handlers: bool,
     /// Custom type mappings
     pub type_mappings: BTreeMap<String, String>,
     /// Optional streaming configuration for SSE client generation
@@ -56,6 +58,7 @@ impl Default for GeneratorConfig {
             enable_sse_client: true,
             enable_async_client: true,
             enable_specta: false,
+            enable_axum_handlers: false,
             type_mappings: default_type_mappings(),
             streaming_config: None,
             nullable_field_overrides: BTreeMap::new(),
@@ -135,6 +138,15 @@ impl CodeGenerator {
             files.push(GeneratedFile {
                 path: "client.rs".into(),
                 content: http_content,
+            });
+        }
+
+        // Generate axum handlers if enabled
+        if self.config.enable_axum_handlers {
+            let axum_content = self.generate_axum_handlers(analysis)?;
+            files.push(GeneratedFile {
+                path: "handlers.rs".into(),
+                content: axum_content,
             });
         }
 
@@ -1483,7 +1495,7 @@ impl CodeGenerator {
         result
     }
 
-    pub(crate) fn to_rust_type_name(&self, s: &str) -> String {
+    pub fn to_rust_type_name(&self, s: &str) -> String {
         // Convert string to valid Rust type name (PascalCase)
         let mut result = String::new();
         let mut next_upper = true;
@@ -1541,7 +1553,7 @@ impl CodeGenerator {
         result
     }
 
-    fn to_rust_field_name(&self, s: &str) -> String {
+    pub fn to_rust_field_name(&self, s: &str) -> String {
         // Convert field name to snake_case properly
         let mut result = String::new();
         let mut prev_was_upper = false;
