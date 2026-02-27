@@ -310,3 +310,92 @@ fn test_generate_wrapper_handlers() {
     let result_str = result.unwrap().to_string();
     insta::assert_snapshot!(result_str);
 }
+
+#[test]
+fn test_generated_code_compiles() {
+    let config = create_test_config();
+    let generator = CodeGenerator::new(config);
+
+    // Create a complex operation with various parameter types
+    let operations = vec![
+        OperationInfo {
+            operation_id: "getUser".to_string(),
+            method: "GET".to_string(),
+            path: "/users/{id}".to_string(),
+            request_body: None,
+            response_schemas: {
+                let mut map = BTreeMap::new();
+                map.insert("200".to_string(), "User".to_string());
+                map
+            },
+            parameters: vec![ParameterInfo {
+                name: "id".to_string(),
+                location: "path".to_string(),
+                required: true,
+                schema_ref: Some("string".to_string()),
+                rust_type: "String".to_string(),
+            }],
+            supports_streaming: false,
+            stream_parameter: None,
+        },
+        OperationInfo {
+            operation_id: "createUser".to_string(),
+            method: "POST".to_string(),
+            path: "/users".to_string(),
+            request_body: Some(RequestBodyContent::Json {
+                schema_name: "CreateUserRequest".to_string(),
+            }),
+            response_schemas: {
+                let mut map = BTreeMap::new();
+                map.insert("201".to_string(), "User".to_string());
+                map
+            },
+            parameters: vec![],
+            supports_streaming: false,
+            stream_parameter: None,
+        },
+        OperationInfo {
+            operation_id: "listUsers".to_string(),
+            method: "GET".to_string(),
+            path: "/users".to_string(),
+            request_body: None,
+            response_schemas: {
+                let mut map = BTreeMap::new();
+                map.insert("200".to_string(), "UserList".to_string());
+                map
+            },
+            parameters: vec![
+                ParameterInfo {
+                    name: "limit".to_string(),
+                    location: "query".to_string(),
+                    required: false,
+                    schema_ref: Some("integer".to_string()),
+                    rust_type: "i32".to_string(),
+                },
+                ParameterInfo {
+                    name: "offset".to_string(),
+                    location: "query".to_string(),
+                    required: false,
+                    schema_ref: Some("integer".to_string()),
+                    rust_type: "i32".to_string(),
+                },
+            ],
+            supports_streaming: false,
+            stream_parameter: None,
+        },
+    ];
+
+    let analysis = create_test_analysis_with_operations(operations);
+    let result = generator.generate_axum_handlers(&analysis);
+    assert!(result.is_ok(), "Handler generation should succeed");
+
+    let handler_code = result.unwrap();
+
+    // Try to parse as Rust code
+    let parse_result = syn::parse_file(&handler_code);
+    assert!(
+        parse_result.is_ok(),
+        "Generated code should parse as valid Rust: {:?}",
+        parse_result.err()
+    );
+}
