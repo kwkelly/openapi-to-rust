@@ -142,6 +142,7 @@ impl CodeGenerator {
         }
 
         // Generate axum handlers if enabled
+        #[cfg(feature = "axum-handlers")]
         if self.config.enable_axum_handlers {
             let axum_content = self.generate_axum_handlers(analysis)?;
             files.push(GeneratedFile {
