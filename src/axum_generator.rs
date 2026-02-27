@@ -67,10 +67,7 @@ impl CodeGenerator {
         let method_name = format_ident!("{}", self.to_rust_field_name(&op.operation_id));
         let doc_comment = self.generate_operation_doc_comment(op);
 
-        // Generate parameters
         let params = self.generate_handler_params(op);
-
-        // Generate return type
         let return_type = self.generate_return_type(op);
 
         quote! {
@@ -189,7 +186,6 @@ impl CodeGenerator {
     fn generate_operation_parameter_structs(&self, op: &OperationInfo) -> TokenStream {
         let mut structs = TokenStream::new();
 
-        // Path parameters struct
         let path_params: Vec<_> = op
             .parameters
             .iter()
@@ -218,7 +214,6 @@ impl CodeGenerator {
             });
         }
 
-        // Query parameters struct
         let query_params: Vec<_> = op
             .parameters
             .iter()
@@ -327,10 +322,7 @@ impl CodeGenerator {
         let handler_name = format_ident!("handle_{}", self.to_rust_field_name(&op.operation_id));
         let method_name = format_ident!("{}", self.to_rust_field_name(&op.operation_id));
 
-        // Generate extractor parameters
         let extractor_params = self.generate_extractor_params(op);
-
-        // Generate call arguments
         let call_args = self.generate_call_args(op);
 
         quote! {
@@ -374,7 +366,6 @@ impl CodeGenerator {
             .filter(|p| p.location == "header")
             .collect();
 
-        // Path parameters
         if !path_params.is_empty() {
             let struct_name =
                 format_ident!("{}PathParams", self.to_rust_type_name(&op.operation_id));
@@ -383,7 +374,6 @@ impl CodeGenerator {
             });
         }
 
-        // Query parameters
         if !query_params.is_empty() {
             let struct_name =
                 format_ident!("{}QueryParams", self.to_rust_type_name(&op.operation_id));
@@ -392,7 +382,6 @@ impl CodeGenerator {
             });
         }
 
-        // Header parameters
         for param in &header_params {
             let param_name = format_ident!("{}", self.to_rust_field_name(&param.name));
             params.push(quote! {
@@ -400,7 +389,6 @@ impl CodeGenerator {
             });
         }
 
-        // Request body
         if let Some(ref body) = op.request_body {
             if let Some(schema_name) = body.schema_name() {
                 let body_type = format_ident!("{}", self.to_rust_type_name(schema_name));
