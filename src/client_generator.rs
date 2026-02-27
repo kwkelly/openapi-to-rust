@@ -490,17 +490,6 @@ impl CodeGenerator {
         }
     }
 
-    /// Generate documentation comment for the operation
-    pub fn generate_operation_doc_comment(&self, op: &OperationInfo) -> TokenStream {
-        let method = op.method.to_uppercase();
-        let path = &op.path;
-        let doc = format!("{} {}", method, path);
-
-        quote! {
-            #[doc = #doc]
-        }
-    }
-
     /// Get the method name from the operation
     fn get_method_name(&self, op: &OperationInfo) -> syn::Ident {
         let name = if !op.operation_id.is_empty() {
@@ -588,22 +577,6 @@ impl CodeGenerator {
             quote! {}
         } else {
             quote! { #(#params),* }
-        }
-    }
-
-    /// Get the Rust type for a parameter
-    pub fn get_param_rust_type(&self, param: &crate::analysis::ParameterInfo) -> TokenStream {
-        let type_str = &param.rust_type;
-        match type_str.as_str() {
-            "String" => quote! { impl AsRef<str> },
-            "i64" => quote! { i64 },
-            "i32" => quote! { i32 },
-            "f64" => quote! { f64 },
-            "bool" => quote! { bool },
-            _ => {
-                let type_ident = syn::Ident::new(type_str, proc_macro2::Span::call_site());
-                quote! { #type_ident }
-            }
         }
     }
 
@@ -762,59 +735,6 @@ impl CodeGenerator {
             quote! {
                 let url = format!("{}{}", self.base_url, format!(#format_string, #(#format_args),*));
             }
-        }
-    }
-
-    /// Sanitize a parameter name by escaping Rust reserved keywords
-    fn sanitize_param_name(&self, name: &str) -> String {
-        let snake_case = name.to_snake_case();
-        match snake_case.as_str() {
-            "type" => "type_".to_string(),
-            "match" => "match_".to_string(),
-            "fn" => "fn_".to_string(),
-            "impl" => "impl_".to_string(),
-            "trait" => "trait_".to_string(),
-            "struct" => "struct_".to_string(),
-            "enum" => "enum_".to_string(),
-            "mod" => "mod_".to_string(),
-            "use" => "use_".to_string(),
-            "pub" => "pub_".to_string(),
-            "const" => "const_".to_string(),
-            "static" => "static_".to_string(),
-            "let" => "let_".to_string(),
-            "mut" => "mut_".to_string(),
-            "ref" => "ref_".to_string(),
-            "move" => "move_".to_string(),
-            "return" => "return_".to_string(),
-            "if" => "if_".to_string(),
-            "else" => "else_".to_string(),
-            "while" => "while_".to_string(),
-            "for" => "for_".to_string(),
-            "loop" => "loop_".to_string(),
-            "break" => "break_".to_string(),
-            "continue" => "continue_".to_string(),
-            "self" => "self_".to_string(),
-            "super" => "super_".to_string(),
-            "crate" => "crate_".to_string(),
-            "async" => "async_".to_string(),
-            "await" => "await_".to_string(),
-            "override" => "override_".to_string(),
-            "box" => "box_".to_string(),
-            "dyn" => "dyn_".to_string(),
-            "where" => "where_".to_string(),
-            "in" => "in_".to_string(),
-            "abstract" => "abstract_".to_string(),
-            "become" => "become_".to_string(),
-            "do" => "do_".to_string(),
-            "final" => "final_".to_string(),
-            "macro" => "macro_".to_string(),
-            "priv" => "priv_".to_string(),
-            "try" => "try_".to_string(),
-            "typeof" => "typeof_".to_string(),
-            "unsized" => "unsized_".to_string(),
-            "virtual" => "virtual_".to_string(),
-            "yield" => "yield_".to_string(),
-            _ => snake_case,
         }
     }
 }

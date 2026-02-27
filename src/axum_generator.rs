@@ -185,24 +185,6 @@ impl CodeGenerator {
         })
     }
 
-    /// Get concrete Rust type for a parameter (suitable for struct fields)
-    /// Unlike get_param_rust_type which returns impl Trait for flexibility,
-    /// this returns concrete types that can be used in struct definitions
-    fn get_concrete_param_type(&self, param: &crate::analysis::ParameterInfo) -> TokenStream {
-        let type_str = &param.rust_type;
-        match type_str.as_str() {
-            "String" => quote! { String },
-            "i64" => quote! { i64 },
-            "i32" => quote! { i32 },
-            "f64" => quote! { f64 },
-            "bool" => quote! { bool },
-            _ => {
-                let type_ident = syn::Ident::new(type_str, proc_macro2::Span::call_site());
-                quote! { #type_ident }
-            }
-        }
-    }
-
     /// Generate parameter structs for a single operation
     fn generate_operation_parameter_structs(&self, op: &OperationInfo) -> TokenStream {
         let mut structs = TokenStream::new();
