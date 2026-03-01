@@ -4,7 +4,8 @@ expression: result_str
 ---
 use axum::{
     extract::{Path, Query, Json, State},
-    http::StatusCode, response::{IntoResponse, Response},
+    http::{StatusCode, request::Parts},
+    response::{IntoResponse, Response},
     routing::{get, post, put, delete, patch},
     Router,
 };
@@ -62,16 +63,18 @@ pub trait ApiHandlers: Send + Sync + 'static {
     async fn delete_user(
         &self,
         Path(DeleteUserPathParams): Path<DeleteUserPathParams>,
+        parts: Parts,
     ) -> Result<Json<Void>, Self::Error>;
 }
 async fn handle_delete_user<H>(
     State(handler): State<H>,
     Path(path_params): Path<DeleteUserPathParams>,
+    parts: Parts,
 ) -> impl IntoResponse
 where
     H: ApiHandlers,
 {
-    match handler.delete_user(Path(path_params)).await {
+    match handler.delete_user(Path(path_params), parts).await {
         Ok(response) => response.into_response(),
         Err(err) => {
             let api_error = ApiError::InternalServerError(err.to_string());

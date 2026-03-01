@@ -4,7 +4,8 @@ expression: result_str
 ---
 use axum::{
     extract::{Path, Query, Json, State},
-    http::StatusCode, response::{IntoResponse, Response},
+    http::{StatusCode, request::Parts},
+    response::{IntoResponse, Response},
     routing::{get, post, put, delete, patch},
     Router,
 };
@@ -57,17 +58,19 @@ pub trait ApiHandlers: Send + Sync + 'static {
     ///POST /users
     async fn create_user(
         &self,
+        parts: Parts,
         Json(body): Json<CreateUserRequest>,
     ) -> Result<Json<User>, Self::Error>;
 }
 async fn handle_create_user<H>(
     State(handler): State<H>,
+    parts: Parts,
     Json(body): Json<CreateUserRequest>,
 ) -> impl IntoResponse
 where
     H: ApiHandlers,
 {
-    match handler.create_user(Json(body)).await {
+    match handler.create_user(parts, Json(body)).await {
         Ok(response) => response.into_response(),
         Err(err) => {
             let api_error = ApiError::InternalServerError(err.to_string());

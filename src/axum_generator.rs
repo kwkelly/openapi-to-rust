@@ -15,7 +15,7 @@ impl CodeGenerator {
         let code = quote! {
             use axum::{
                 extract::{Path, Query, Json, State},
-                http::StatusCode,
+                http::{StatusCode, request::Parts},
                 response::{IntoResponse, Response},
                 routing::{get, post, put, delete, patch},
                 Router,
@@ -74,13 +74,13 @@ impl CodeGenerator {
             #doc_comment
             async fn #method_name(
                 &self,
-                #params
+                #(#params,)*
             ) -> Result<#return_type, Self::Error>;
         }
     }
 
     /// Generate handler parameters based on operation parameters and request body
-    fn generate_handler_params(&self, op: &OperationInfo) -> TokenStream {
+    fn generate_handler_params(&self, op: &OperationInfo) -> Vec<TokenStream> {
         let mut params = Vec::new();
 
         // Group parameters by location
@@ -128,7 +128,14 @@ impl CodeGenerator {
             });
         }
 
+        // Add the Parts parameter for access to headers, extensions, etc.
+        // This must come BEFORE body-consuming extractors like Json
+        params.push(quote! {
+            parts: Parts
+        });
+
         // Generate request body parameter if present
+        // This MUST be last because it consumes the request body
         if let Some(ref body) = op.request_body {
             if let Some(schema_name) = body.schema_name() {
                 let body_type = format_ident!("{}", self.to_rust_type_name(schema_name));
@@ -138,9 +145,7 @@ impl CodeGenerator {
             }
         }
 
-        quote! {
-            #(#params),*
-        }
+        params
     }
 
     /// Generate return type for handler
@@ -328,12 +333,12 @@ impl CodeGenerator {
         quote! {
             async fn #handler_name<H>(
                 State(handler): State<H>,
-                #extractor_params
+                #(#extractor_params,)*
             ) -> impl IntoResponse
             where
                 H: ApiHandlers,
             {
-                match handler.#method_name(#call_args).await {
+                match handler.#method_name(#(#call_args,)*).await {
                     Ok(response) => response.into_response(),
                     Err(err) => {
                         // Convert error to ApiError if needed
@@ -346,7 +351,7 @@ impl CodeGenerator {
     }
 
     /// Generate extractor parameters for wrapper handler
-    fn generate_extractor_params(&self, op: &OperationInfo) -> TokenStream {
+    fn generate_extractor_params(&self, op: &OperationInfo) -> Vec<TokenStream> {
         let mut params = Vec::new();
 
         // Group parameters by location
@@ -389,6 +394,13 @@ impl CodeGenerator {
             });
         }
 
+        // Add Parts parameter for access to headers, extensions, etc.
+        // This must come BEFORE body-consuming extractors like Json
+        params.push(quote! {
+            parts: Parts
+        });
+
+        // Body-consuming extractor must be LAST
         if let Some(ref body) = op.request_body {
             if let Some(schema_name) = body.schema_name() {
                 let body_type = format_ident!("{}", self.to_rust_type_name(schema_name));
@@ -398,13 +410,11 @@ impl CodeGenerator {
             }
         }
 
-        quote! {
-            #(#params),*
-        }
+        params
     }
 
     /// Generate call arguments for trait method invocation
-    fn generate_call_args(&self, op: &OperationInfo) -> TokenStream {
+    fn generate_call_args(&self, op: &OperationInfo) -> Vec<TokenStream> {
         let mut args = Vec::new();
 
         let path_params: Vec<_> = op
@@ -436,13 +446,14 @@ impl CodeGenerator {
             args.push(quote! { #param_name });
         }
 
+        // Add parts argument before body
+        args.push(quote! { parts });
+
         if op.request_body.is_some() {
             args.push(quote! { Json(body) });
         }
 
-        quote! {
-            #(#args),*
-        }
+        args
     }
 
     /// Generate router builder

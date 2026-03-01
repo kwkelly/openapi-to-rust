@@ -227,7 +227,7 @@ use petstore_api::types::*;
 use axum::{
     extract::{Path, Query},
     Json, Router,
-    http::StatusCode,
+    http::{StatusCode, request::Parts},
 };
 
 // Create a simple handler implementation
@@ -241,6 +241,7 @@ impl ApiHandlers for TestHandler {
     async fn list_pets(
         &self,
         Query(params): Query<ListPetsQueryParams>,
+        parts: Parts,
     ) -> Result<Json<PetList>, Self::Error> {
         Ok(Json(PetList {
             pets: Some(vec![]),
@@ -250,6 +251,7 @@ impl ApiHandlers for TestHandler {
 
     async fn create_pet(
         &self,
+        parts: Parts,
         Json(body): Json<CreatePetRequest>,
     ) -> Result<Json<Pet>, Self::Error> {
         Ok(Json(Pet {
@@ -262,6 +264,7 @@ impl ApiHandlers for TestHandler {
     async fn get_pet(
         &self,
         Path(params): Path<GetPetPathParams>,
+        parts: Parts,
     ) -> Result<Json<Pet>, Self::Error> {
         Ok(Json(Pet {
             id: params.id,
@@ -273,6 +276,7 @@ impl ApiHandlers for TestHandler {
     async fn delete_pet(
         &self,
         Path(params): Path<DeletePetPathParams>,
+        parts: Parts,
     ) -> Result<StatusCode, Self::Error> {
         Ok(StatusCode::NO_CONTENT)
     }
@@ -301,7 +305,7 @@ name = "petstore_api"
 path = "lib.rs"
 
 [dependencies]
-axum = "0.7"
+axum = "0.8"
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
